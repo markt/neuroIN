@@ -1,21 +1,27 @@
 import os
 
 import numpy as np
+import pandas as pd
 
 from mne.io import read_raw_edf
 from mne.channels import make_standard_montage
 from mne import events_from_annotations
 from mne.channels.montage import DigMontage
+from mne.datasets import eegbci # CONSIDER IF SHOULD BE .EDF SOURCE AGNOSTIC
+
+import torch
+from torch.utils.data import Dataset, DataLoader
+from torchvision.transforms import ToTensor
 
 
-def load_raw_edf(fname, ch_names=None, montage_kind='standard_1005'):
+def load_raw_edf(fname, ch_names=None, montage_kind='standard_1005', verbose=False):
     '''
     Loads a trial by filename and returns an MNE RawEDF object
 
     ch_names is an optional dictionary for renaming channels
     montage_kind is an optional DigMontage or montage_kind string
     '''
-    raw = read_raw_edf(fname, preload=True)
+    raw = read_raw_edf(fname, preload=True, verbose=verbose)
 
     # check if new channel names specified, otherwise create them
     if ch_names:
@@ -74,52 +80,64 @@ def edf_to_numpy(edf, max_length=None, save=False, data_dir='data', prefix='even
     return trials, labels
 
 
-
-
-
-class Trials():
+def save_subjects(subject_dict, runs, max_length=None, verbose=False):
     '''
-    Custom class to store raw data from a trial
+    Saves data from .EDF files into .csv files for PyTorch
+    
+    subject_dict stores each group of subjects (e.g. training) with a corresponding list of ID's
+    '''
+    dataset_dict = {}
+    
+    for group in subject_dict:
+        open(f'{group}_annotations.csv', 'w').close()
+        
+        for subject in subject_dict[group]:
+            for fname in eegbci.load_data(subject, runs, verbose=verbose):
+                edf = load_raw_edf(fname, verbose=verbose)
+                
+                pre_name = fname.split('/')[-1].split('.')[0]
+                trials, labels = edf_to_numpy(edf, max_length=max_length, save=True, data_dir=group, prefix=pre_name)
+
+
+class eegDataset(Dataset):
+    '''
+    Subclass of PyTorch Dataset to prepare EEG files for PyTorch
+
+    Each EEG event is stored in a .csv file contained in data_dir
+    annotations_file stores the name of each .csv and corresponding label
     '''
 
-    def __init__(self, fname):
-        try:
-            raw = read_raw_edf(fname, preload=True)
+    def __init__(self, annotations_file, data_dir, transform=None, target_transform=None):
+        self.data_labels = pd.read_csv(annotations_file, header=None)
+        self.data_dir = data_dir
+        self.transform = transform
+        self.target_transform = target_transform
+    
+    def __len__(self):
+        return len(self.data_labels)
+    
+    def __getitem__(self, idx):
+        data_path = os.path.join(self.data_dir, self.data_labels.iloc[idx, 0])
+        data = pd.read_csv(data_path, header=None).to_numpy()
+        label = self.data_labels.iloc[idx, 1]
+        if self.transform:
+            data = self.transform(data)
+        if self.target_transform:
+            label = self.target_transform(label)
+        return data, label
 
-        except(OSError, FileNotFoundError):
-            print(f'Unable to find {fname}')
 
-        except Exception as error:
-            print(f'Error: {error}')
-
-        # replace channel names
-        new_names = {ch: ch.rstrip('.').upper().replace('Z', 'z').replace('FP', 'Fp') for ch in raw.ch_names}
-        raw.rename_channels(new_names)
-
-        # standardize montage
-        montage = make_standard_montage('standard_1005')
-        raw.set_montage(montage)
-
-
-
-        events, blank = events_from_annotations(raws)
-
-        data, times = raw[:, :]
-        self.data, self.times = data, times
-
-        trials = []
-        labels = []
-
-        mapping = {1:'T0', 2:'T1', 3:'T2'}
-
-        for i in range(len(events) - 1):
-            start, end, label = events[i][0], events[i+1][0], mapping[events[i][2]]
-            trials.append(data[:,start:end])
-            labels.append(label)
-            
-        start, end, label = events[-1][0], data.shape[1], mapping[events[-1][2]]
-        trials.append(data[:,start:end])
-        labels.append(label)
-
-        self.trials = trials
-        self.labels = labels
+def load_subjects(groups, parent_dir=os.getcwd(), transform=ToTensor(), batch_size=1, shuffle=True):
+    '''
+    Loads groups of data into PyTorch DataLoader objects
+    '''
+    data_loaders = []
+    
+    if isinstance(groups, dict):
+        groups = [*groups]
+    
+    for group in groups:
+        dataset = eegDataset(f'{group}_annotations.csv', f'{parent_dir}/{group}', transform=ToTensor())
+        data_loaders.append(DataLoader(dataset, batch_size=batch_size, shuffle=shuffle))
+    
+    return data_loaders
