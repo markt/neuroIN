@@ -40,32 +40,39 @@ def load_raw_edf(fname, ch_names=None, montage_kind='standard_1005', verbose=Fal
 
     return raw
 
-def edf_to_numpy(edf, max_length=None, save=False, data_dir='data', prefix='event'):
+def edf_to_numpy(edf, mapping='auto', length=None, save=False, data_dir='data', prefix='event'):
     '''
     Converts an MNE RawEDF object into a list of numpy arrays for each event and list of corresponding labels
 
     Can optionally save each numpy array into a .csv with an associated file 'annotations.csv' containing labels
+    
+    Can take in and return label_mapping
+    (LABEL_MAPPING INPUT MAY BE REDUNDANT IF CONSISTENT ACROSS ALL TRIALS?? ONLY HAVE TO ENSURE LABELING IS
+    CONSISTENT ACROSS SUBJECTS, CONSIDER REMOVING)
+    ADD UNIT TEST PERHAPS?
     '''
     data, times = edf[:, :]
-    events, mapping = events_from_annotations(edf)
+    events, mapping = events_from_annotations(edf, mapping)
 
+    # if not mapping:
+    #     mapping = default_mapping
     # reverse mapping gives annotations from data
-    rmapping = {v: k for k, v in mapping.items()}    
+    # rmapping = {v: k for k, v in mapping.items()}    
 
     trials = []
     labels = []
 
     for i in range(len(events) - 1):
-        start, end, label = events[i][0], events[i+1][0], rmapping[events[i][2]]
+        start, end, label = events[i][0], events[i+1][0], events[i][2]
         trials.append(data[:,start:end])
         labels.append(label)
     # handle last event separately as there is no next index
-    start, _, label = events[-1][0], data.shape[1], rmapping[events[-1][2]]
+    start, _, label = events[-1][0], data.shape[1], events[-1][2]
     trials.append(data[:,start:])
     labels.append(label)
 
-    if max_length: # could this maybe be a transform??
-        trials = [t[:,:max_length] for t in trials]
+    if length: # could this maybe be a transform??
+        trials = [t[:,:length] for t in trials]
 
     if save:
         if not os.path.exists(f'{os.getcwd()}/{data_dir}'):
@@ -74,13 +81,16 @@ def edf_to_numpy(edf, max_length=None, save=False, data_dir='data', prefix='even
         with open(f'{data_dir}_annotations.csv', 'a') as f:
             for i in range(len(trials)):
                 fname = f'{prefix}_{i}.csv'
-                np.savetxt(f'{data_dir}/{fname}', trials[i], delimiter=',')
-                f.write(f'{fname}, {labels[i]}\n')
+                if length and trials[i].shape[1] != length:
+                    print(f'{fname} has invalid length of {trials[i].shape[1]}, not saving trial')
+                else:
+                    np.savetxt(f'{data_dir}/{fname}', trials[i], delimiter=',')
+                    f.write(f'{fname}, {labels[i]}\n')
 
     return trials, labels
 
 
-def save_subjects(subject_dict, runs, max_length=None, verbose=False):
+def save_subjects(subject_dict, runs, length=None, mapping='auto', verbose=False):
     '''
     Saves data from .EDF files into .csv files for PyTorch
     
@@ -89,14 +99,17 @@ def save_subjects(subject_dict, runs, max_length=None, verbose=False):
     dataset_dict = {}
     
     for group in subject_dict:
-        open(f'{group}_annotations.csv', 'w').close()
+        open(f'{group}_annotations.csv', 'w').close() # clears file
         
         for subject in subject_dict[group]:
             for fname in eegbci.load_data(subject, runs, verbose=verbose):
                 edf = load_raw_edf(fname, verbose=verbose)
                 
                 pre_name = fname.split('/')[-1].split('.')[0]
-                trials, labels = edf_to_numpy(edf, max_length=max_length, save=True, data_dir=group, prefix=pre_name)
+                trials, labels = edf_to_numpy(edf, mapping=mapping, length=length, save=True, data_dir=group, prefix=pre_name)
+    
+        # rlabel_mapping = {v: k for k, v in label_mapping.items()}
+        # pd.DataFrame.from_dict(rlabel_mapping, orient='index').to_csv(f'{group}_mapping.csv', header=False)
 
 
 class eegDataset(Dataset):
@@ -112,6 +125,9 @@ class eegDataset(Dataset):
         self.data_dir = data_dir
         self.transform = transform
         self.target_transform = target_transform
+
+        # mapping = pd.read_csv(mapping_file, header=None, index_col=False).to_dict('split')
+        # self.mapping = {d[0]: d[1] for d in mapping['data']}
     
     def __len__(self):
         return len(self.data_labels)

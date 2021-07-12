@@ -1,65 +1,53 @@
+import torch.nn as nn
+
 class CNN2D(nn.Module):
-	def __init__(self):
-		# F_temp = 8
-		# k_temp = 128
-		# F_spac = 2 * F_temp
-		# k_temp = 64
+    '''
+    Subclass of PyTorch nn.Module for a basic 2D CNN
+    '''
 
-		F1 = 8
-		D = 2
-		k_temp = 128
-		C = 64
-		F2 = F1 * D
+    def __init__(self, dropout_p=0.5, n_classes=2, num_channels=64, temp_kernel_length=128, spac_kernel_length=16, F1=8, D=2, F2=16):
+        super(CNN2D, self).__init__()
 
-		super(CNN2D, self).__init__()
+        self.dropout_p = dropout_p
+        self.n_classes = n_classes
+        self.num_channels = num_channels
+        self.temp_kernel_length = temp_kernel_length
+        self.spac_kernel_length = spac_kernel_length
 
-		# self.conv = nn.Sequential(
-		# 	nn.Conv2d(1, F1, (1, k_temp)),
-		# 	nn.BatchNorm2d(2*F1),
-		# 	nn.Conv2d(F1, D*F1, (C, 1)),
-		# 	nn.BatchNorm2d(2*D*F1),
-		# 	nn.ReLu(),
-		# 	nn.AvgPool2d((1, 4)),
-		# 	nn.Dropout(p=0.5),
-		# 	nn.Conv2D(D*F1, F2, (1, 16)),
-		# 	nn.BatchNorm2d(2*F2),
-		# 	nn.ReLu(),
-		# 	nn.AvgPool2d((1, 8)),
-		# 	nn.Dropout(p=0.5),
-		# 	)
-		# self.fc = nn.Linear(
-		# 	nn.flatten(),
-		# 	nn.Softmax())
+        self.F1 = F1
+        self.D = D
+        self.F2 = F2
 
-		self.conv_temp = nn.Sequential(
-			nn.Conv2d(1, 8, (1, 128)),
-			nn.BatchNorm2d(8)
-			)
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(1, self.F1, (1, self.temp_kernel_length)),
+            nn.BatchNorm2d(self.F1)
+            )
 
-		self.conv_spac = nn.Sequential(
-			nn.Conv2d(8, 16, (64, 1)),
-			nn.BatchNorm2d(16),
-			nn.ReLu(),
-			nn.AvgPool2d(1, 4),
-			nn.Dropout(p=0.5)
-			)
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(self.F1, (self.F1 * self.D), (self.num_channels, 1)),
+            nn.BatchNorm2d((self.F1 * self.D)),
+            nn.ELU(),
+            nn.AvgPool2d((1, 4), stride=4),
+            nn.Dropout(p=self.dropout_p)
+            )
 
-		self.conv_point = nn.Sequential(
-			nn.Conv2d(16, 16, (1, 16)),
-			nn.Conv2d(16, 16, (1, 1))
-			nn.BatchNorm2d(16),
-			nn.ReLu(),
-			nn.AvgPool2d((1, 8)),
-			nn.Dropout(p=0.5)
-			)
+        self.conv3 = nn.Sequential(
+            nn.Conv2d((self.F1 * self.D), (self.F1 * self.D), (1, self.spac_kernel_length)),
+            nn.Conv2d((self.F1 * self.D), self.F2, 1),
+            nn.BatchNorm2d(self.F2),
+            nn.ELU(),
+            nn.AvgPool2d((1, 8), stride=8),
+            nn.Dropout(p=self.dropout_p)
+            )
 
-		self.out = nn.Linear((16 * 8), 2)
+        self.layers = nn.Sequential(self.conv1, self.conv2, self.conv3)
 
-	def forward(self, x):
-		x = self.conv_temp(x)
-		x = self.conv_spac(x)
-		x = self.conv_point(x)
+        self.output = nn.Sequential(
+            nn.Linear(224, self.n_classes)
+            )
 
-		x = self.out(x)
-		return nn.Softmax(x)
-		return x
+    def forward(self, x):
+        x = self.layers(x)
+        x = x.view(x.size()[0], -1)
+        x = self.output(x)
+        return x
