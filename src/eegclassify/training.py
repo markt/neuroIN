@@ -47,12 +47,13 @@ def test_loop(dataloader, model, loss_fun, device="cpu", name='Test'):
     
     return correct, test_loss
 
-def train(data_dir, epochs=10, batch_size=24, lr=1e-2, momentum=0.9, use_GPU=True, shuffle=True):
+def train(data_dir, epochs=10, batch_size=24, lr=1e-2, momentum=0.9, dropout_p=0.5, use_GPU=True, shuffle=True):
+    init_timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     device = torch.device("cuda:0" if use_GPU and torch.cuda.is_available() else "cpu")
 
     train_loader, val_loader, test_loader = [DataLoader(dataset, batch_size=batch_size, shuffle=shuffle) for dataset in load_train_test(data_dir)]
 
-    net = CNN2D(n_classes=3)
+    net = CNN2D(n_classes=3, dropout_p=dropout_p)
     net = net.to(device)
 
     criterion = nn.CrossEntropyLoss()
@@ -60,6 +61,8 @@ def train(data_dir, epochs=10, batch_size=24, lr=1e-2, momentum=0.9, use_GPU=Tru
 
     hist_d = {'Train_acc': [], 'Train_loss': [], 'Val_acc': [], 'Val_loss': []}
     best_val_acc = 0
+    epochs_since_improv = 0
+    improv_thresh = 20
     for i in range(epochs):
         print(f"\nEpoch {i+1}\n---------------------")
         train_loop(train_loader, net, criterion, optimizer, device=device)
@@ -72,9 +75,15 @@ def train(data_dir, epochs=10, batch_size=24, lr=1e-2, momentum=0.9, use_GPU=Tru
         hist_d['Val_loss'].append(val_loss)
 
         if val_acc > best_val_acc:
-            torch.save(net.state_dict(), data_path / f'checkpoint.pt')
+            torch.save(net.state_dict(), data_path / f'checkpoint_{init_timestamp}.pt')
             best_val_acc = val_acc
             print(f'Checkpoint saved at epoch {i}')
+            epochs_since_improv = 0
+
+        epochs_since_improv += 1
+        if epochs_since_improv > improv_thresh:
+            print(f'val accuracy has not improved in {improv_thresh} epochs, stopping early')
+            break
     history = pd.DataFrame(data=hist_d)
 
     test_loop(test_loader, net, criterion, device=device)

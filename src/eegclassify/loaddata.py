@@ -161,7 +161,7 @@ def load_subjects(groups, parent_dir=Path.cwd(), transform=ToTensor(), batch_siz
 def load_eegmmidb(data_dir, between_subjects=True, edf_dir=None, mapping={'T0': 0, 'T1': 1, 'T2': 2}, length=640, verbose=True):
     '''
     data_dir: path that .CSVs are located or will be saved to
-    between_subects: boolean for between or within subjects if training/testing split not present
+    between_subjects: boolean for between or within subjects if training/testing split not present
     edf_dir: directory where .EDFs are located
     mapping: mapping of original labels to PyTorch labels
     length: length of a given trial (sampling rate * seconds)
@@ -209,7 +209,7 @@ def load_eegmmidb(data_dir, between_subjects=True, edf_dir=None, mapping={'T0': 
 
     if not (data_path / 'train').is_dir() or not (data_path / 'test').is_dir():
         print('train_annotations.csv or test_annotations.csv not present, generating training/testing split')
-        gen_train_test_dirs(data_dir)
+        gen_train_test_dirs(data_dir, between_subjects=between_subjects)
 
     if not (data_path / 'train_mean.npy').is_file() or not (data_path / 'train_std.npy').is_file():
         print('normalizing')
@@ -217,35 +217,61 @@ def load_eegmmidb(data_dir, between_subjects=True, edf_dir=None, mapping={'T0': 
 
     return load_train_test(data_dir)
 
-def gen_train_test_dirs(data_dir):
+def gen_train_test_dirs(data_dir, between_subjects=True, train_with_null=False):
     '''
     DOES NOT SUPPORT WITHIN SUBJECTS YET
     '''
     data_path = Path(data_dir)
     shuffled_df = pd.read_csv(data_path / 'annotations.csv').sample(frac=1, random_state=0).reset_index(drop=True)
 
-    df_len = len(shuffled_df)
-    train_i, val_i, test_i = int(.7*df_len), int(.85*df_len), df_len
+    if between_subjects:
+        df_len = len(shuffled_df)
+        train_i, val_i, test_i = int(.7*df_len), int(.85*df_len), df_len
 
-    # group_dfs = ['train': annotation_df[:train_i], 'val': annotation_df[train_i:val_i], 'test': annotation_df[val_i:]]
-    group_labels = np.concatenate((np.repeat('train', train_i), np.repeat('val', (val_i - train_i)), np.repeat('test', (test_i - val_i))))
-    shuffled_df['group'] = group_labels
-    shuffled_df.to_csv(data_path / 'annotations.csv')
+        # group_dfs = ['train': annotation_df[:train_i], 'val': annotation_df[train_i:val_i], 'test': annotation_df[val_i:]]
+        group_labels = np.concatenate((np.repeat('train', train_i), np.repeat('val', (val_i - train_i)), np.repeat('test', (test_i - val_i))))
+        shuffled_df['group'] = group_labels
+        shuffled_df.to_csv(data_path / 'annotations.csv')
 
-    groups = [shuffled_df[:train_i], shuffled_df[train_i:val_i], shuffled_df[val_i:]]
-    # group_dfs = shuffled_df.iloc[:train], shuffled_df.iloc[train_i:val_i], shuffled_df.iloc[val_i:]
+        groups = [shuffled_df[:train_i], shuffled_df[train_i:val_i], shuffled_df[val_i:]]
+        # group_dfs = shuffled_df.iloc[:train], shuffled_df.iloc[train_i:val_i], shuffled_df.iloc[val_i:]
 
-    for i, group in enumerate(['train', 'val', 'test']):
-        group_path = data_path / group
-        group_path.mkdir(parents=True, exist_ok=True)
-        groups[i].apply(lambda x: shutil.move(str(data_path / x['csv_file']), str(group_path / x['csv_file'])), axis=1)
-        groups[i].to_csv(group_path / 'annotations.csv')
+        for i, group in enumerate(['train', 'val', 'test']):
+            group_path = data_path / group
+            group_path.mkdir(parents=True, exist_ok=True)
+            groups[i].apply(lambda x: shutil.move(str(data_path / x['csv_file']), str(group_path / x['csv_file'])), axis=1)
+            groups[i].to_csv(group_path / 'annotations.csv')
+    else:
+        ids = shuffled_df['subject_id'].unique()
+        ids_length = len(ids)
 
-def normalize_from_train(data_dir):
+        train_i, val_i, test_i = int(.7*ids_length), int(.85*ids_length), ids_length
+        group_labels = np.concatenate((np.repeat('train', train_i), np.repeat('val', (val_i - train_i)), np.repeat('test', (test_i - val_i))))
+        ids_dict = {ids[i]: group_labels[i] for i in range(ids_length)}
+        shuffled_df['group'] = shuffled_df['subject_id'].apply(lambda x: ids_dict[x])
+        shuffled_df.to_csv(data_path / 'annotations.csv')
+
+        for group in ['train', 'val', 'test']:
+            group_df = shuffled_df[shuffled_df['group'] == group]
+            group_path = data_path / group
+            group_path.mkdir(parents=True, exist_ok=True)
+            group_df.apply(lambda x: shutil.move(str(data_path / x['csv_file']), str(group_path / x['csv_file'])), axis=1)
+            group_df.to_csv(group_path / 'annotations.csv')
+
+    if train_with_null:
+        shuffled_df.loc[shuffled_df['label'] == 0, 'group'] = 'train'
+
+
+def normalize_from_train(data_dir, weighted=False):
     data_path = Path(data_dir)
     groups = ['train', 'val', 'test']
     group_dfs = [pd.read_csv(data_path / group / 'annotations.csv') for group in groups]
     train_df = group_dfs[0]
+
+    if weighted:
+        weights = 1 / train_df['label'].value_counts(normalize=True)
+    else:
+        
 
     mean_sum = np.float64(np.repeat(0, 64))
     std_sum = np.float64(np.repeat(0, 64))
