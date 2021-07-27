@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-def train_loop(dataloader, model, loss_fn, optimizer, device="cpu"):
+def train_loop(dataloader, model, loss_fn, optimizer, device="cpu", verbose=False):
     size = len(dataloader.dataset)
     
     for i, (X, y) in enumerate(dataloader):
@@ -26,9 +26,9 @@ def train_loop(dataloader, model, loss_fn, optimizer, device="cpu"):
         
         if i % 100 == 0:
             loss, samples = loss.item(), i * len(X)
-            print(f"[{samples:>3d}/{size:>3d}] loss: {loss:>7f}")
+            if verbose: print(f"[{samples:>3d}/{size:>3d}] loss: {loss:>7f}")
 
-def test_loop(dataloader, model, loss_fun, device="cpu", name='Test'):
+def test_loop(dataloader, model, loss_fun, device="cpu", name='Test', verbose=False):
     size = len(dataloader.dataset)
     num_batches = len(dataloader)
     test_loss, correct = 0, 0
@@ -43,20 +43,23 @@ def test_loop(dataloader, model, loss_fun, device="cpu", name='Test'):
     
     test_loss = test_loss / num_batches
     correct = correct / size
-    print(f"{name} Error: Accuracy {(100*correct):>0.1f}, Avg loss: {test_loss:>.7f}")
+    if verbose: print(f"{name} Error: Accuracy {(100*correct):>0.1f}, Avg loss: {test_loss:>.7f}")
     
     return correct, test_loss
 
-def train(data_dir, epochs=10, batch_size=24, lr=1e-2, momentum=0.9, dropout_p=0.5, use_GPU=True, shuffle=True):
+def train(data_dir, epochs=10, batch_size=24, lr=1e-2, momentum=0.9, dropout_p=0.5, use_GPU=True, shuffle=True, num_channels=64, verbose=False):
     init_timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     device = torch.device("cuda:0" if use_GPU and torch.cuda.is_available() else "cpu")
+    data_path = Path(data_dir)
 
     train_loader, val_loader, test_loader = [DataLoader(dataset, batch_size=batch_size, shuffle=shuffle) for dataset in load_train_test(data_dir)]
+    train_df = train_loader.dataset.df
 
-    net = CNN2D(n_classes=3, dropout_p=dropout_p)
+    n_classes = train_df['label'].nunique()
+    net = CNN2D(n_classes=n_classes, dropout_p=dropout_p, num_channels=num_channels)
     net = net.to(device)
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weights=train_df.weights)
     optimizer = optim.SGD(net.parameters(), lr=lr, momentum=momentum)
 
     hist_d = {'Train_acc': [], 'Train_loss': [], 'Val_acc': [], 'Val_loss': []}
@@ -64,10 +67,10 @@ def train(data_dir, epochs=10, batch_size=24, lr=1e-2, momentum=0.9, dropout_p=0
     epochs_since_improv = 0
     improv_thresh = 20
     for i in range(epochs):
-        print(f"\nEpoch {i+1}\n---------------------")
-        train_loop(train_loader, net, criterion, optimizer, device=device)
-        train_acc, train_loss = test_loop(train_loader, net, criterion, device=device, name='Train')
-        val_acc, val_loss = test_loop(val_loader, net, criterion, device=device, name='Val')
+        if verbose: print(f"\nEpoch {i+1}\n---------------------")
+        train_loop(train_loader, net, criterion, optimizer, device=device, verbose=verbose)
+        train_acc, train_loss = test_loop(train_loader, net, criterion, device=device, name='Train', verbose=verbose)
+        val_acc, val_loss = test_loop(val_loader, net, criterion, device=device, name='Val', verbose=verbose)
 
         hist_d['Train_acc'].append(train_acc)
         hist_d['Train_loss'].append(train_loss)
@@ -86,7 +89,10 @@ def train(data_dir, epochs=10, batch_size=24, lr=1e-2, momentum=0.9, dropout_p=0
             break
     history = pd.DataFrame(data=hist_d)
 
-    test_loop(test_loader, net, criterion, device=device)
+    print(f'Model params: epochs={epochs}, batch_size={batch_size}, lr={lr}, momentum={momentum}, dropout_p={dropout_p}')
+    print(f'Best validation accuracy was {(100*best_val_acc):>0.1f}%')
+
+    test_loop(test_loader, net, criterion, device=device, verbose=True)
 
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     data_path = Path(data_dir)
