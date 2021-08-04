@@ -10,5 +10,5 @@ def dir_file_types(dir):
     :rtype: set
     """
     data_path = Path(dir)
-    exts = {ext for _, ext in data_path.rglob('*')}
+    exts = {ext for _, ext in [splitext(f) for f in data_path.rglob('*')]}
     return exts

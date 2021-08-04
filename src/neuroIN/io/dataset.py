@@ -1,7 +1,6 @@
 from utils import dir_file_types
 from edf import edf_to_np
 
-from os.path import splitext
 from pathlib import Path
 import re
 import numpy as np
