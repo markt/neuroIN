@@ -9,32 +9,28 @@ The basic workflow for neuroIN is:
 -visualize results and network features
 
 
-# classifyEEG
-Package for building CNNs for EEG classification
+## Overview of modules
 
+### io
 
-# data sources:
-eegmmidb: MNE
-BCI IV 2A: https://github.com/bregydoc/bcidatasetIV2a
+`neuroin.io` contains functions and classes associated with importing datasets from neuroimaging data formats into NumPy arrays. Information on imported datasets is stored in configuration files that are used to load `Dataset` objects so imported datasets can be used.
 
-many sources: https://github.com/meagmohit/EEG-Datasets#eeg-datasets
+### preprocess
 
+`neuroin.preprocess` contains functions for preprocessing imported data; this entails training/testing split generation, data normalization, and data augmentation methods.
 
+### models
 
+`neuroin.models` contains classes for the different architectures supported by the package.
 
+### training
 
-## Hyperparameter optimization
+`neuroin.training` contains function to train models, classify data, log training history, and save trained models.
 
+### optim
 
-choice:
--optimizers?
+`neuroin.optim` contains functions for optimizing network hyperparameters.
 
-quniform:
--epochs
--batch size
+### vis
 
-
-uniform
-
-loguniform:
-- learning rate
+`neuroin.vis` contains visualization functions for training results and feature visualization.

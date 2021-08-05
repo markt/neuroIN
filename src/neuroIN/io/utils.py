@@ -11,4 +11,5 @@ def dir_file_types(dir):
     """
     data_path = Path(dir)
     exts = {ext for _, ext in [splitext(f) for f in data_path.rglob('*')]}
+    exts.discard("")
     return exts
