@@ -1,17 +1,17 @@
-from utils import dir_file_types
-from edf import edf_to_np
+from .utils import dir_file_types
+from .edf import edf_to_np
 
 from pathlib import Path
 import re
 import numpy as np
 import pandas as pd
-import yaml
+import json
 import torch
 from torch.utils.data import Dataset as torchDataset
 from torch.utils.data import DataLoader
 from torchvision.transforms import ToTensor
 
-neuroIN_extensions = {'edf': edf_to_np}
+neuroIN_extensions = {'.edf': edf_to_np}
 neuroIN_data_path = Path('/Users/marktaylor/neuroIN/data')
 
 def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id_regex=r'\d+'):
@@ -43,24 +43,22 @@ def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id
         dataset_name = targ_path.stem
     annotations_f_name = targ_path / "annotations.csv"
 
-    extensions = dir_file_types(orig_dir).union(neuroIN_extensions)
+    extensions = dir_file_types(orig_dir)
+    assert extensions, "No files with supported extensions detected."
+    ext_funcs = {ext: neuroIN_extensions[ext] for ext in extensions}
 
     dataset_params = {"name": dataset_name,
                       "orig_dir": str(orig_path.expanduser()),
                       "data_dir": str(targ_path.expanduser()),
                       "data_annotations": str(annotations_f_name.expanduser()),
-                      "extensions": extensions}
-
-    # append basic dataset info to config file of all datasets
-    with open(neuroIN_data_path / "datasets.yaml", 'a') as stream:
-        yaml.dump(dataset_params, stream)
+                      "extensions": list(extensions)}
 
     trials_dict = {"np_file": [], "label": [], "subject_id": [],
                    "ext": [], "n_channels": [], "length": []}
     mapping = {}
-    for ext, ext_func in extensions:
+    for ext, ext_func in ext_funcs.items():
         for orig_f in orig_path.rglob(orig_f_pattern + ext):
-            f_name, subject_id = orig_f.stem
+            f_name = orig_f.stem
             subject_id = re.search(id_regex, f_name).group()
 
             trials, labels, file_mapping = ext_func(orig_f)
@@ -85,8 +83,8 @@ def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id
     dataset_params["weights"] = None
 
     # write config file in new dataset's directory
-    with open(targ_path / "dataset_info.yaml", 'w') as stream:
-        yaml.dump(dataset_params, stream)
+    with open(targ_path / "dataset_info.json", 'w') as stream:
+        json.dump(dataset_params, stream, sort_keys=True, indent=4)
 
 class Dataset(torchDataset):
     '''
@@ -97,9 +95,11 @@ class Dataset(torchDataset):
         self.data_path = Path(data_dir).expanduser()
         assert self.data_path.is_dir(), "data_dir must be a directory"
 
-        dataset_params = yaml.safe_load(self.data_path / "dataset_info.yaml")
+        with open(self.data_path / "dataset_info.json", 'r') as stream:
+            dataset_params = json.load(stream)
 
-        for key, value in dataset_params.item():
+        print(dataset_params)
+        for key, value in dataset_params.items():
             setattr(self, key, value)
         
         if not self.transform: self.transform = transform
@@ -116,7 +116,7 @@ class Dataset(torchDataset):
     def __getitem__(self, idx):
         data = np.load((self.data_path / self.np_files[idx]))
         label = self.data_labels[idx]
-        if data.n_dim > 2:
+        if data.ndim > 2:
             data = torch.from_numpy(data).unsqueeze(0)
         else:
             if self.transform:
