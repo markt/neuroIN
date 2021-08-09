@@ -50,7 +50,7 @@ def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id
     dataset_params = {"name": dataset_name,
                       "orig_dir": str(orig_path.expanduser()),
                       "data_dir": str(targ_path.expanduser()),
-                      "data_annotations": str(annotations_f_name.expanduser()),
+                      "data_annotations_path": str(annotations_f_name.expanduser()),
                       "extensions": list(extensions)}
 
     trials_dict = {"np_file": [], "label": [], "subject_id": [],
@@ -61,7 +61,7 @@ def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id
             f_name = orig_f.stem
             subject_id = re.search(id_regex, f_name).group()
 
-            trials, labels, file_mapping = ext_func(orig_f)
+            trials, labels, file_mapping, ch_names = ext_func(orig_f)
             mapping.update(file_mapping)
 
             for i, trial in enumerate(trials):
@@ -78,9 +78,11 @@ def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id
     # initialize more detailed dataset info for config file
     dataset_params["mapping"] = mapping
     dataset_params["n_dim"] = 2
+    dataset_params["preprocessing"] = []
     dataset_params["transform"] = None
     dataset_params["target_transform"] = None
     dataset_params["weights"] = None
+    dataset_params["ch_names"] = ch_names
 
     # write config file in new dataset's directory
     with open(targ_path / "dataset_info.json", 'w') as stream:
@@ -98,15 +100,14 @@ class Dataset(torchDataset):
         with open(self.data_path / "dataset_info.json", 'r') as stream:
             dataset_params = json.load(stream)
 
-        print(dataset_params)
         for key, value in dataset_params.items():
             setattr(self, key, value)
         
         if not self.transform: self.transform = transform
         if not self.target_transform: self.target_transform = target_transform
-        if not self.data_annotations: self.data_annotations = self.data_path / "annotations.csv"
+        if not self.data_annotations_path: self.data_annotations_path = self.data_path / "annotations.csv"
 
-        self.annotations_df = pd.read_csv(Path(self.data_annotations))
+        self.annotations_df = pd.read_csv(Path(self.data_annotations_path))
         self.data_labels = self.annotations_df['label'].values
         self.np_files = self.annotations_df['np_file'].values
 
@@ -127,3 +128,18 @@ class Dataset(torchDataset):
     
     def get_dataloader(self, batch_size, shuffle=True):
         return DataLoader(self, batch_size=batch_size, shuffle=shuffle)
+    
+    def update_param(self, key, value):
+        with open(self.data_path / "dataset_info.json", 'r') as stream:
+            dataset_params = json.load(stream)
+        
+        dataset_params[key] = value
+
+        with open(self.data_path / "dataset_info.json", 'w') as stream:
+            json.dump(dataset_params, stream, sort_keys=True, indent=4)
+        
+        setattr(self, key, value)
+    
+    def normalize_channels(self):
+        ch_names = [ch.rstrip('.').upper().replace('Z', 'z').replace('FP', 'Fp') for ch in self.ch_names]
+        self.update_param('ch_names', ch_names)

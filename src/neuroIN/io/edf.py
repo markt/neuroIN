@@ -11,7 +11,7 @@ def edf_to_np(edf_f, mapping=None, ch_names=None, np_dtype=np.float32):
     :type ch_names: dict or callable
     :param np_dtype: Type of NumPy array
     :type np_dtype: type
-    :return: Returns a list of NumPy arrays, an array of labels, and a dict with mapping
+    :return: Returns a list of NumPy arrays, an array of labels, a dict with mapping, and channel names
     """
     edf = read_raw_edf(edf_f, preload=True)
     if ch_names: edf.rename_channels(ch_names)
@@ -26,4 +26,4 @@ def edf_to_np(edf_f, mapping=None, ch_names=None, np_dtype=np.float32):
     data = np.split(data, time_samples, axis=1)
     data[-1] = data[-1][:,~np.all(data[-1] == 0, axis=0)] # trim zeros off of final event
 
-    return data, labels, mapping
+    return data, labels, mapping, edf.ch_names
