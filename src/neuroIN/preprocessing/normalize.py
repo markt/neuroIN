@@ -13,6 +13,5 @@ def normalize_from_train(data_dir):
 
     for f in data_path.rglob("*.npy"):
         ar = np.load(f)
-        print(f"{f}: {ar.shape}")
         ar = (ar - train_mean[..., None]) / train_std[..., None]
         np.save(f, np.float32(ar))

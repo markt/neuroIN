@@ -32,4 +32,9 @@ def import_eegmmidb(targ_dir, orig_dir=None, subjects='all', runs='all', downloa
 
     if not download_only: import_dataset(orig_dir, targ_dir, dataset_name="eegmmidb")
 
-    Dataset(targ_dir).standardize_channels()
+    data = Dataset(targ_dir)
+
+    data.standardize_channels()
+
+    encoding_dict = {1: 0, 2: 1, 3: 2}
+    data.change_label_encoding(encoding_dict)
