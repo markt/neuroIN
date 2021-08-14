@@ -246,6 +246,13 @@ class Dataset(Set):
         dir_to_3d(self.data_path, type_3d=type_3d, ch_names=self.ch_names)
         self.update_param("n_dim", 3)
         self.update_param("preprocessing", self.preprocessing + [f"to_3d: type_3d={type_3d}"])
+    
+    def change_label_encoding(self, encoding_dict):
+        for csv in self.data_path.rglob("annotations.csv"):
+            annotations_df = pd.read_csv(csv)
+            annotations_df['label'] = annotations_df['label'].apply(lambda x: encoding_dict[x])
+            annotations_df.to_csv(csv, index=False)
+
 
 
 
