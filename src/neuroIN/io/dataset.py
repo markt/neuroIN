@@ -4,13 +4,16 @@ from ..preprocessing.train_test_split import create_split
 from ..preprocessing.crop import trim_length
 from ..preprocessing.to_3d import dir_to_3d
 from ..preprocessing.normalize import normalize_from_train
+# from ..training.optim import run_optim
 
 from pathlib import Path
 import re
 from math import sqrt
+import time
 import numpy as np
 import pandas as pd
 import json
+import tqdm
 import torch
 from torch.utils.data import Dataset as torchDataset
 from torch.utils.data import DataLoader
@@ -50,7 +53,7 @@ def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id
     :param id_regex: The RegEx to parse subject ID's from files, defaults to r'\d+'
     :type id_regex: regexp, optional
     """
-    orig_path, targ_path = Path(orig_dir), Path(targ_dir)
+    orig_path, targ_path = Path(orig_dir).expanduser(), Path(targ_dir).expanduser()
 
     assert orig_path.is_dir(), 'orig_dir must be a directory'
     targ_path.mkdir(parents=True, exist_ok=True)
@@ -73,7 +76,8 @@ def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id
                    "ext": [], "n_channels": [], "length": []}
     mapping = {}
     for ext, ext_func in ext_funcs.items():
-        for orig_f in orig_path.rglob(orig_f_pattern + ext):
+        print(f"Processing {ext} files...")
+        for orig_f in tqdm.tqdm(orig_path.rglob(orig_f_pattern + ext)):
             f_name = orig_f.stem
             subject_id = re.search(id_regex, f_name).group()
 
@@ -88,6 +92,7 @@ def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id
 
                 for dict_name, item in zip(trials_dict.keys(), [npy_f, labels[i], subject_id, ext, n_channels, length]):
                     trials_dict[dict_name].append(item)
+        print(f"{ext} files processed.")
 
     pd.DataFrame(trials_dict).to_csv(annotations_f_name, index=False)
 
@@ -100,6 +105,7 @@ def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id
     dataset_params["target_transform"] = None
     dataset_params["class_weights"] = None
     dataset_params["ch_names"] = ch_names
+    dataset_params["optims"] = []
 
     # write config file in new dataset's directory
     with open(targ_path / "config.json", 'w') as stream:
@@ -143,6 +149,10 @@ class Set(torchDataset):
     
     def get_annotation_df(self):
         return pd.read_csv(Path(self.data_path / "annotations.csv"))
+    
+    @property
+    def df(self):
+        return self.get_annotation_df()
     
     def mean_std(self, weights=None, save=True):
         # initialize empty array with size channels (or 2D locations) by number of samples
@@ -254,8 +264,6 @@ class Dataset(Set):
             annotations_df.to_csv(csv, index=False)
 
 
-
-
     def get_set(self, set_name):
         assert self.split_into_sets == True, "Data has not been split into sets yet!"
         return Set(self.data_path / set_name, transform=self.transform, target_transform=self.target_transform)
@@ -289,6 +297,18 @@ class Dataset(Set):
     def standardize_channels(self):
         ch_names = [ch.rstrip('.').upper().replace('Z', 'z').replace('FP', 'Fp') for ch in self.ch_names]
         self.update_param('ch_names', ch_names)
+    
+    def init_optim(self, config, fname=None):
+        if not fname: fname = self.name + '_' + time.strftime("%Y%m%d-%H%M%S") + '.pt'
+
+        self.optim_path = self.data_path / "optims"
+        self.optim_path.mkdir(parents=True, exist_ok=True)
+
+        f = str(self.optim_path / fname)
+        torch.save(config, f)
+        self.update_param("model_optims", self.model_optims + [f])
+
+        print(f"Optimization configuration file saved to: {f}")
 
 class Dataset3D(Dataset):
     """Set3D is a subclass of Dataset specifically for 3D data
