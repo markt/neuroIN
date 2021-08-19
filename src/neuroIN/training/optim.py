@@ -50,15 +50,10 @@ def test(model, data_loader):
     return loss / len(data_loader), correct / total
 
 def test_best_model(best_trial):
-    test_loader = Dataset(best_trial.config["data_dir"]).test.get_dataloader(best_trial.config["batch_size"])
+    dataset = Dataset(best_trial.config["data_dir"])
+    test_loader = dataset.test.get_dataloader(best_trial.config["batch_size"])
 
-    best_model = best_trial.config["model"](n_classes=3, dropout_p=best_trial.config["dropout_p"],
-        temp_kernel_length=best_trial.config["temp_kernel_length"],
-        spac_kernel_length=best_trial.config["spac_kernel_length"],
-        F1=best_trial.config["F1"],
-        D=best_trial.config["D"],
-        F2=best_trial.config["F2"],
-        l2=best_trial.config["l2"])
+    best_model = best_trial.config["model"](n_classes=dataset.n_classes, **best_trial.config)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     best_model.to(device)
 
@@ -73,13 +68,9 @@ def test_best_model(best_trial):
 def train_dataset(config, checkpoint_dir=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = config["model"](n_classes=3, dropout_p=config["dropout_p"],
-        temp_kernel_length=config["temp_kernel_length"],
-        spac_kernel_length=config["spac_kernel_length"],
-        F1=config["F1"],
-        D=config["D"],
-        F2=config["F2"],
-        l2=config["l2"])
+    dataset = Dataset(config["data_dir"])
+
+    model = config["model"](n_classes=dataset.n_classes, **config)
     model.to(device)
 
     criterion = nn.CrossEntropyLoss()
@@ -92,7 +83,6 @@ def train_dataset(config, checkpoint_dir=None):
         model.load_state_dict(model_state)
         optimizer.load_state_dict(optimizer_state)
     
-    dataset = Dataset(config["data_dir"])
     trainset = dataset.train
 
     test_abs = int(len(trainset) * .8)
@@ -149,24 +139,12 @@ def main():
     parser = argparse.ArgumentParser(description="Optimize a Dataset")
     parser.add_argument('data_dir', help="Directory of Dataset")
     args = parser.parse_args()
-    print(args.data_dir)
-    print(Dataset(args.data_dir))
 
-    config = {
-        "data_dir": Path(os.getcwd()) / args.data_dir,
-        "checkpoint_dir": Path(os.getcwd()) / args.data_dir / "checkpoints",
-        "model": CNN2D,
-        "dropout_p": tune.uniform(0, 0.8),
-        "lr": tune.loguniform(1e-4, 1e-1),
-        "momentum": tune.uniform(0.1, 0.9),
-        "batch_size": tune.choice([8, 16]),
-        "temp_kernel_length": tune.randint(64, 256),
-        "spac_kernel_length": tune.randint(8, 24),
-        "F1": tune.randint(4, 12),
-        "D": tune.choice([1, 2, 4]),
-        "F2": tune.randint(4, 12),
-        "l2": tune.randint(1, 64)
-    }
+    print(f"Optimizing Dataset located at: {args.data_dir}")
+
+    dataset = Dataset(args.data_dir)
+
+    config = dataset.last_optim
     run_optim(config)
 
 if __name__ == "__main__":
