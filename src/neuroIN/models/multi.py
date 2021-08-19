@@ -92,7 +92,7 @@ class MultiBranchCNN3D(nn.Module):
     '''
 
     def __init__(self, dropout_p=0.5, n_classes=2, fc_size=32, **extras):
-        super(MultiBranchCNN2D, self).__init__()
+        super(MultiBranchCNN3D, self).__init__()
 
         self.dropout_p = dropout_p
         self.n_classes = n_classes
@@ -148,7 +148,7 @@ class MultiBranchCNN3D(nn.Module):
         self.output = nn.Sequential(
             nn.Linear(output_input_size, self.n_classes)
             )
-            
+
 
     def forward(self, x):
         x = unsqueeze(x, 1)
