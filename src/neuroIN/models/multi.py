@@ -23,7 +23,7 @@ class MultiBranchCNN2D(nn.Module):
         self.F2 = F2
 
 
-        self.conv_branches = []
+        self.conv_branches = nn.ModuleList()
         for (temp_kernel_length, spac_kernel_length) in zip(temp_kernel_lengths, spac_kernel_lengths):
             conv1 = nn.Sequential(
             nn.Conv2d(1, self.F1, (1, temp_kernel_length)),
@@ -49,7 +49,7 @@ class MultiBranchCNN2D(nn.Module):
 
             self.conv_branches.append(nn.Sequential(conv1, conv2, conv3))
 
-        self.fc_branches = []
+        self.fc_branches = nn.ModuleList()
         for conv_branch in self.conv_branches:
             dummy = zeros((1, 1, 64, 640))
             fc_input_size = flatten(conv_branch(dummy)).shape[0]
@@ -104,7 +104,7 @@ class MultiBranchCNN3D(nn.Module):
             nn.Dropout(p=self.dropout_p)
             )
         
-        self.conv_branches = []
+        self.conv_branches = nn.ModuleList()
         for k_temp in [1, 3, 5]:
             conv1 = nn.Sequential(
                 nn.Conv3d(16, 32, (2, 2, k_temp), stride=(2, 2, 2), padding=(1, 1, 0), dilation=1),
@@ -122,10 +122,10 @@ class MultiBranchCNN3D(nn.Module):
                 
             self.conv_branches.append(nn.Sequential(conv1, conv2))
 
-        self.fc_branches = []
+        self.fc_branches = nn.ModuleList()
         for conv_branch in self.conv_branches:
             dummy = zeros((1, 1, 5, 5, 640))
-            fc_input_size = flatten(conv_branch(dummy)).shape[0]
+            fc_input_size = flatten(conv_branch(self.common_conv(dummy))).shape[0]
 
             fc1 = nn.Sequential(
                 nn.Linear(fc_input_size, fc_size),
@@ -152,6 +152,7 @@ class MultiBranchCNN3D(nn.Module):
 
     def forward(self, x):
         x = unsqueeze(x, 1)
+        x = self.common_conv(x)
         xs = [branch(x) for branch in self.conv_branches]
         xs = [x.view(x.size()[0], -1) for x in xs]
         xs = [branch(x) for (x, branch) in zip(xs, self.fc_branches)]
