@@ -99,6 +99,7 @@ def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id
     # initialize more detailed dataset info for config file
     dataset_params["label_encoding"] = mapping
     dataset_params["n_dim"] = 2
+    dataset_params["n_classes"] = len(mapping)
     dataset_params["split_into_sets"] = False
     dataset_params["preprocessing"] = []
     dataset_params["transform"] = None
@@ -309,6 +310,13 @@ class Dataset(Set):
         self.update_param("model_optims", self.model_optims + [f])
 
         print(f"Optimization configuration file saved to: {f}")
+    
+    def get_optim(self, i):
+        return torch.load(self.model_optims[i])
+
+    @property
+    def last_optim(self):
+        return torch.load(self.model_optims[-1])
 
 class Dataset3D(Dataset):
     """Set3D is a subclass of Dataset specifically for 3D data
