@@ -6,7 +6,7 @@ class CNN2D(nn.Module):
     Subclass of PyTorch nn.Module for a basic 2D CNN
     '''
 
-    def __init__(self, dropout_p=0.5, n_classes=2, num_channels=64, temp_kernel_length=128, spac_kernel_length=16, F1=8, D=2, F2=16, l1=224, l2=32):
+    def __init__(self, dropout_p=0.5, n_classes=2, num_channels=64, temp_kernel_length=128, spac_kernel_length=16, F1=8, D=2, F2=16, l1=224, l2=32, **extras):
         '''
         size_for_fc should be automated
         '''
