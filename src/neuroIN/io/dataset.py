@@ -5,7 +5,6 @@ from ..preprocessing.train_test_split import create_split
 from ..preprocessing.crop import trim_length
 from ..preprocessing.to_3d import dir_to_3d
 from ..preprocessing.normalize import normalize_from_train
-# from ..training.optim import run_optim
 
 from pathlib import Path
 import re
@@ -99,7 +98,7 @@ def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id
     dataset_params["target_transform"] = None
     dataset_params["class_weights"] = None
     dataset_params["ch_names"] = ch_names
-    dataset_params["optims"] = []
+    dataset_params["model_optims"] = []
 
     # write config file in new dataset's directory
     with open(targ_path / "config.json", 'w') as stream:

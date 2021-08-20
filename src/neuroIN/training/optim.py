@@ -53,7 +53,7 @@ def test_best_model(best_trial):
     dataset = Dataset(best_trial.config["data_dir"])
     test_loader = dataset.test.get_dataloader(best_trial.config["batch_size"])
 
-    best_model = best_trial.config["model"](n_classes=dataset.n_classes, **best_trial.config)
+    best_model = best_trial.config["model"](n_classes=dataset.n_classes, shape=dataset.train[0][0].shape, **best_trial.config)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     best_model.to(device)
 
@@ -70,7 +70,7 @@ def train_dataset(config, checkpoint_dir=None):
 
     dataset = Dataset(config["data_dir"])
 
-    model = config["model"](n_classes=dataset.n_classes, **config)
+    model = config["model"](n_classes=dataset.n_classes, shape=dataset.train[0][0].shape, **config)
     model.to(device)
 
     criterion = nn.CrossEntropyLoss()
