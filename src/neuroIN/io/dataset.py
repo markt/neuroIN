@@ -1,5 +1,6 @@
 from .utils import dir_file_types
 from .edf import edf_to_np
+from .gdf import gdf_to_np
 from ..preprocessing.train_test_split import create_split
 from ..preprocessing.crop import trim_length
 from ..preprocessing.to_3d import dir_to_3d
@@ -19,21 +20,10 @@ from torch.utils.data import Dataset as torchDataset
 from torch.utils.data import DataLoader
 from torchvision.transforms import ToTensor
 
-neuroIN_extensions = {'.edf': edf_to_np}
+neuroIN_extensions = {'.edf': edf_to_np, '.gdf': gdf_to_np}
 neuroIN_data_path = Path('/Users/marktaylor/neuroIN/data')
 
-def initialize_config(data_dir):
-    """ TODO: initialize a config file before importing dataset, or have one built
-
-    :param data_dir: [description]
-    :type data_dir: [type]
-    """
-    data_path = Path(data_dir)
-    data_path.mkdir(parents=True, exist_ok=True)
-
-    config_d = {''}
-
-def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id_regex=r'\d+'):
+def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id_regex=r'\d+', resample_freq=None):
     """Import a new dataset into neuroIN.
 
     This function imports a dataset of files with recognized extensions into
@@ -81,17 +71,20 @@ def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id
             f_name = orig_f.stem
             subject_id = re.search(id_regex, f_name).group()
 
-            trials, labels, file_mapping, ch_names = ext_func(orig_f)
-            mapping.update(file_mapping)
+            try:
+                trials, labels, file_mapping, ch_names = ext_func(orig_f, resample_freq=resample_freq)
+                mapping.update(file_mapping)
 
-            for i, trial in enumerate(trials):
-                npy_f = f'{f_name}_{i}.npy'
-                np.save(targ_path / npy_f, trial)
+                for i, trial in enumerate(trials):
+                    npy_f = f'{f_name}_{i}.npy'
+                    np.save(targ_path / npy_f, trial)
 
-                n_channels, length = trial.shape
+                    n_channels, length = trial.shape
 
-                for dict_name, item in zip(trials_dict.keys(), [npy_f, labels[i], subject_id, ext, n_channels, length]):
-                    trials_dict[dict_name].append(item)
+                    for dict_name, item in zip(trials_dict.keys(), [npy_f, labels[i], subject_id, ext, n_channels, length]):
+                        trials_dict[dict_name].append(item)
+            except ValueError:
+                print(f"{f_name} does not contain known labels, trials will be diregarded.")
         print(f"{ext} files processed.")
 
     pd.DataFrame(trials_dict).to_csv(annotations_f_name, index=False)
