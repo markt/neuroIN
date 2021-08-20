@@ -51,7 +51,7 @@ class MultiBranchCNN2D(nn.Module):
 
         self.fc_branches = nn.ModuleList()
         for conv_branch in self.conv_branches:
-            dummy = zeros(shape)
+            dummy = zeros((1, 1) + shape)
             fc_input_size = flatten(conv_branch(dummy)).shape[0]
 
             fc1 = nn.Sequential(
@@ -124,7 +124,7 @@ class MultiBranchCNN3D(nn.Module):
 
         self.fc_branches = nn.ModuleList()
         for conv_branch in self.conv_branches:
-            dummy = zeros(shape)
+            dummy = zeros((1, 1) + shape)
             fc_input_size = flatten(conv_branch(self.common_conv(dummy))).shape[0]
 
             fc1 = nn.Sequential(

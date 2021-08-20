@@ -39,7 +39,7 @@ class CNN3D(nn.Module):
 
         self.layers = nn.Sequential(self.conv1, self.conv2, self.conv3)
 
-        dummy = zeros(shape)
+        dummy = zeros((1, 1) + shape)
         l1 = flatten(self.layers(dummy)).shape[0]
 
         self.output = nn.Sequential(
