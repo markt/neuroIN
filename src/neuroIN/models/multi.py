@@ -7,7 +7,7 @@ class MultiBranchCNN2D(nn.Module):
     Subclass of PyTorch nn.Module for a basic 2D CNN
     '''
 
-    def __init__(self, dropout_p=0.5, n_classes=2, num_channels=64, temp_kernel_lengths=[64, 128], spac_kernel_lengths=[8, 16], F1=8, D=2, F2=16, fc_size=32, **extras):
+    def __init__(self, dropout_p=0.5, n_classes=2, shape=(64, 640), num_channels=64, temp_kernel_lengths=[64, 128], spac_kernel_lengths=[8, 16], F1=8, D=2, F2=16, fc_size=32, **extras):
         assert len(temp_kernel_lengths) == len(spac_kernel_lengths), 'Must have equal number of Temporal and Spatial lengths'
 
         super(MultiBranchCNN2D, self).__init__()
@@ -51,7 +51,7 @@ class MultiBranchCNN2D(nn.Module):
 
         self.fc_branches = nn.ModuleList()
         for conv_branch in self.conv_branches:
-            dummy = zeros((1, 1, 64, 640))
+            dummy = zeros(shape)
             fc_input_size = flatten(conv_branch(dummy)).shape[0]
 
             fc1 = nn.Sequential(
@@ -91,7 +91,7 @@ class MultiBranchCNN3D(nn.Module):
     Subclass of PyTorch nn.Module for a basic 2D CNN
     '''
 
-    def __init__(self, dropout_p=0.5, n_classes=2, fc_size=32, **extras):
+    def __init__(self, dropout_p=0.5, n_classes=2, shape=(5, 5, 640), fc_size=32, **extras):
         super(MultiBranchCNN3D, self).__init__()
 
         self.dropout_p = dropout_p
@@ -124,7 +124,7 @@ class MultiBranchCNN3D(nn.Module):
 
         self.fc_branches = nn.ModuleList()
         for conv_branch in self.conv_branches:
-            dummy = zeros((1, 1, 5, 5, 640))
+            dummy = zeros(shape)
             fc_input_size = flatten(conv_branch(self.common_conv(dummy))).shape[0]
 
             fc1 = nn.Sequential(
