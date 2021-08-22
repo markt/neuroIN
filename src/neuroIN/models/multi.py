@@ -159,3 +159,87 @@ class MultiBranchCNN3D(nn.Module):
         x = cat(xs, 1)
         x = self.output(x)
         return x
+
+
+class MultiBranchCNN2Plus1D(nn.Module):
+    '''
+    Subclass of PyTorch nn.Module for a basic 2D CNN
+    '''
+
+    def __init__(self, dropout_p=0.5, n_classes=2, shape=(5, 5, 640), fc_size=32, **extras):
+        super(MultiBranchCNN2Plus1D, self).__init__()
+
+        self.dropout_p = dropout_p
+        self.n_classes = n_classes
+
+        self.common_conv = nn.Sequential(
+            nn.Conv3d(1, 16, (3, 3, 1), stride=(2, 2, 1), padding=(2, 2, 0), dilation=1),
+            nn.BatchNorm3d(16),
+            nn.ELU(),
+            nn.Conv3d(16, 16, (1, 1, 5), stride=(1, 1, 4), padding=(0, 0, 0), dilation=1),
+            nn.BatchNorm3d(16),
+            nn.ELU(),
+            nn.Dropout(p=self.dropout_p)
+            )
+        
+        self.conv_branches = nn.ModuleList()
+        for k_temp in [1, 3, 5]:
+            conv1 = nn.Sequential(
+                nn.Conv3d(16, 32, (2, 2, 1), stride=(2, 2, 1), padding=(1, 1, 0), dilation=1),
+                nn.BatchNorm3d(32),
+                nn.ELU(),
+                nn.Conv3d(32, 32, (1, 1, k_temp), stride=(1, 1, 2), padding=(0, 0, 0), dilation=1),
+                nn.BatchNorm3d(32),
+                nn.ELU(),
+                nn.Dropout(p=self.dropout_p)
+                )
+            
+            conv2 = nn.Sequential(
+                nn.Conv3d(32, 64, (3, 3, 1), stride=(2, 2, 1), padding=(1, 1, 0), dilation=1),
+                nn.BatchNorm3d(64),
+                nn.ELU(),
+                nn.Conv3d(64, 64, (1, 1, k_temp), stride=(1, 1, 2), padding=(0, 0, 0), dilation=1),
+                nn.BatchNorm3d(64),
+                nn.ELU(),
+                nn.Dropout(p=self.dropout_p)
+                )
+                
+            self.conv_branches.append(nn.Sequential(conv1, conv2))
+
+        self.fc_branches = nn.ModuleList()
+        for conv_branch in self.conv_branches:
+            dummy = zeros((1, 1) + shape)
+            fc_input_size = flatten(conv_branch(self.common_conv(dummy))).shape[0]
+
+            fc1 = nn.Sequential(
+                nn.Linear(fc_input_size, fc_size),
+                nn.BatchNorm1d(fc_size),
+                nn.ReLU()
+            )
+            fc2 = nn.Sequential(
+                nn.Linear(fc_size, fc_size),
+                nn.BatchNorm1d(fc_size),
+                nn.ReLU()
+            )
+            fc_output = nn.Sequential(
+                nn.Linear(fc_size, n_classes),
+                nn.Softmax(dim=1)
+            )
+
+            self.fc_branches.append(nn.Sequential(fc1, fc2, fc_output))
+        
+        output_input_size = len(self.fc_branches) * n_classes
+        self.output = nn.Sequential(
+            nn.Linear(output_input_size, self.n_classes)
+            )
+
+
+    def forward(self, x):
+        x = unsqueeze(x, 1)
+        x = self.common_conv(x)
+        xs = [branch(x) for branch in self.conv_branches]
+        xs = [x.view(x.size()[0], -1) for x in xs]
+        xs = [branch(x) for (x, branch) in zip(xs, self.fc_branches)]
+        x = cat(xs, 1)
+        x = self.output(x)
+        return x
