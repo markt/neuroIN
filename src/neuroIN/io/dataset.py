@@ -22,7 +22,7 @@ from torchvision.transforms import ToTensor
 neuroIN_extensions = {'.edf': edf_to_np, '.gdf': gdf_to_np}
 neuroIN_data_path = Path('/Users/marktaylor/neuroIN/data')
 
-def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id_regex=r'\d+', resample_freq=None):
+def import_dataset(orig_dir, targ_dir, dataset_extensions, dataset_name=None, orig_f_pattern='*', id_regex=r'\d+', resample_freq=None, mapping=None):
     """Import a new dataset into neuroIN.
 
     This function imports a dataset of files with recognized extensions into
@@ -53,7 +53,7 @@ def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id
 
     extensions = dir_file_types(orig_dir)
     assert extensions, "No files with supported extensions detected."
-    ext_funcs = {ext: neuroIN_extensions[ext] for ext in extensions}
+    ext_funcs = {ext: dataset_extensions[ext] for ext in extensions}
 
     dataset_params = {"name": dataset_name,
                       "orig_dir": str(orig_path.expanduser()),
@@ -63,7 +63,8 @@ def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id
 
     trials_dict = {"np_file": [], "label": [], "subject_id": [],
                    "ext": [], "n_channels": [], "length": []}
-    mapping = {}
+    if not mapping: mapping = {}
+    ch_names = []
     for ext, ext_func in ext_funcs.items():
         print(f"Processing {ext} files...")
         for orig_f in tqdm.tqdm(orig_path.rglob(orig_f_pattern + ext)):
@@ -71,8 +72,10 @@ def import_dataset(orig_dir, targ_dir, dataset_name=None, orig_f_pattern='*', id
             subject_id = re.search(id_regex, f_name).group()
 
             try:
-                trials, labels, file_mapping, ch_names = ext_func(orig_f, resample_freq=resample_freq)
-                mapping.update(file_mapping)
+                if mapping:
+                    trials, labels, mapping, ch_names = ext_func(orig_f, resample_freq=resample_freq, mapping=mapping)
+                else:
+                    trials, labels, mapping, ch_names = ext_func(orig_f, resample_freq=resample_freq)
 
                 for i, trial in enumerate(trials):
                     npy_f = f'{f_name}_{i}.npy'
@@ -147,32 +150,23 @@ class Set(torchDataset):
     def df(self):
         return self.get_annotation_df()
     
-    def mean_std(self, weights=None, save=True):
+    def mean_std(self, save=True):
         # initialize empty array with size channels (or 2D locations) by number of samples
         means = np.zeros((self[0][0].shape[:-1] + (len(self),)))
 
         # add means across time from each sample to array
         for i, (sample, _) in enumerate(self):
             means[..., i] = sample.mean(axis=-1)
-
-        # optionally calculate inverse weights
-        if weights:
-            inv_weight_dict = (1 / self.get_annotation_df['label'].value_counts(normalize=True)).to_dict()
-            weights = [inv_weight_dict[label] for label in train_df['label']]
-
-            print('saving weights to weights.pt')
-            weight_tensor = torch.Tensor(list(inv_weight_dict.values()))
-            torch.save(weight_tensor, self.data_path / 'weights.pt')
         
         # find means and std for each channel (or 2D location) across samples
-        mean = np.average(means, weights=weights, axis=-1)
-        std = np.average((means - mean[..., None])**2, weights=weights, axis=-1)
+        mean = np.average(means, axis=-1)
+        std = np.average((means - mean[..., None])**2, axis=-1)
 
         if save:
             np.save(self.data_path / 'mean.npy', mean)
             np.save(self.data_path / 'std.npy', mean)
         
-        return mean, std, weights
+        return mean, std
         
         
         
@@ -232,8 +226,8 @@ class Dataset(Set):
 
 
     # preprocessing methods
-    def trim_data_length(self, length):
-        trim_length(self.data_path, length)
+    def trim_data_length(self, length, start_i=0):
+        trim_length(self.data_path, length, start_i=start_i)
         self.update_param("preprocessing", self.preprocessing + [f"trim_length: {length}"])
 
     def create_data_split(self, train_prop=0.7, val_prop=0.15, by_subject=False):
@@ -245,8 +239,8 @@ class Dataset(Set):
         normalize_from_train(self.data_path)
         self.update_param("preprocessing", self.preprocessing + [f"normalized with train"])
 
-    def data_to_3d(self, type_3d='d'):
-        dir_to_3d(self.data_path, type_3d=type_3d, ch_names=self.ch_names)
+    def data_to_3d(self, type_3d='d', d_idxs_override=None):
+        dir_to_3d(self.data_path, type_3d=type_3d, ch_names=self.ch_names, d_idxs_override=d_idxs_override)
         self.update_param("n_dim", 3)
         self.update_param("preprocessing", self.preprocessing + [f"to_3d: type_3d={type_3d}"])
     
@@ -287,8 +281,8 @@ class Dataset(Set):
     def get_dataloaders(self, batch_size, shuffle=True):
         return [self.get_dataloader(set_name, batch_size, shuffle=shuffle) for set_name in ['train', 'val', 'test']]
     
-    def standardize_channels(self):
-        ch_names = [ch.rstrip('.').upper().replace('Z', 'z').replace('FP', 'Fp') for ch in self.ch_names]
+    def standardize_channels(self, ch_names=None):
+        if not ch_names: ch_names = [ch.rstrip('.').upper().replace('Z', 'z').replace('FP', 'Fp') for ch in self.ch_names]
         self.update_param('ch_names', ch_names)
     
     def init_optim(self, config, fname=None):
