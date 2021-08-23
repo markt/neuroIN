@@ -7,9 +7,17 @@ class CNN2Plus1D(nn.Module):
     '''
 
     def __init__(self, dropout_p=0.5, n_classes=2, l2=32, shape=(5, 5, 640), **extras):
-        '''
-        size_for_fc should be automated
-        '''
+        """init for CNN2Plus1D
+
+        :param dropout_p: [description], defaults to 0.5
+        :type dropout_p: float, optional
+        :param n_classes: [description], defaults to 2
+        :type n_classes: int, optional
+        :param l2: the number of units in the final FC layer before classification, defaults to 32
+        :type l2: int, optional
+        :param shape: [description], defaults to (5, 5, 640)
+        :type shape: tuple, optional
+        """
 
         super(CNN2Plus1D, self).__init__()
 

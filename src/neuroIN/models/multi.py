@@ -4,10 +4,33 @@ from torch import cat, flatten, unsqueeze, zeros
 
 class MultiBranchCNN2D(nn.Module):
     '''
-    Subclass of PyTorch nn.Module for a basic 2D CNN
+    Subclass of PyTorch nn.Module for a multibranch 2D CNN
     '''
 
     def __init__(self, dropout_p=0.5, n_classes=2, shape=(64, 640), num_channels=64, temp_kernel_lengths=[64, 128], spac_kernel_lengths=[8, 16], F1=8, D=2, F2=16, fc_size=32, **extras):
+        """init for MultiBranchCNN2D
+
+        :param dropout_p: the dropout rate, defaults to 0.5
+        :type dropout_p: float, optional
+        :param n_classes: the number of classes, defaults to 2
+        :type n_classes: int, optional
+        :param num_channels: the number of channels, defaults to 64
+        :type num_channels: int, optional
+        :param shape: the data shape, defaults to (64, 640)
+        :type shape: tuple, optional
+        :param temp_kernel_length: the temporal kernel length, defaults to 128
+        :type temp_kernel_length: int, optional
+        :param spac_kernel_length: the spatial kernel length, defaults to 16
+        :type spac_kernel_length: int, optional
+        :param F1: the number of temporal filters, defaults to 8
+        :type F1: int, optional
+        :param D: the ratio of spatial filters to temporal filters, defaults to 2
+        :type D: int, optional
+        :param F2: the number of separable filters, defaults to 16
+        :type F2: int, optional
+        :param l2: the number of units in the final FC layer before classification, defaults to 32
+        :type l2: int, optional
+        """
         assert len(temp_kernel_lengths) == len(spac_kernel_lengths), 'Must have equal number of Temporal and Spatial lengths'
 
         super(MultiBranchCNN2D, self).__init__()
@@ -88,10 +111,21 @@ class MultiBranchCNN2D(nn.Module):
 
 class MultiBranchCNN3D(nn.Module):
     '''
-    Subclass of PyTorch nn.Module for a basic 2D CNN
+    Subclass of PyTorch nn.Module for a multibranch 3D CNN
     '''
 
     def __init__(self, dropout_p=0.5, n_classes=2, shape=(5, 5, 640), fc_size=32, **extras):
+        """init for MultiBranchCNN3D
+
+        :param dropout_p: the dropout rate, defaults to 0.5
+        :type dropout_p: float, optional
+        :param n_classes: the number of classes, defaults to 2
+        :type n_classes: int, optional
+        :param shape: the data shape, defaults to (5, 5, 640)
+        :type shape: tuple, optional
+        :param fc_size: the number of units in the final FC layer before classification, defaults to 32
+        :type fc_size: int, optional
+        """
         super(MultiBranchCNN3D, self).__init__()
 
         self.dropout_p = dropout_p
@@ -163,10 +197,21 @@ class MultiBranchCNN3D(nn.Module):
 
 class MultiBranchCNN2Plus1D(nn.Module):
     '''
-    Subclass of PyTorch nn.Module for a basic 2D CNN
+    Subclass of PyTorch nn.Module for a multibranch (2+1)D CNN
     '''
 
     def __init__(self, dropout_p=0.5, n_classes=2, shape=(5, 5, 640), fc_size=32, **extras):
+        """init for MultiBranchCNN2Plus1D
+
+        :param dropout_p: the dropout rate, defaults to 0.5
+        :type dropout_p: float, optional
+        :param n_classes: the number of classes, defaults to 2
+        :type n_classes: int, optional
+        :param shape: the data shape, defaults to (5, 5, 640)
+        :type shape: tuple, optional
+        :param l2: the number of units in the final FC layer before classification, defaults to 32
+        :type l2: int, optional
+        """
         super(MultiBranchCNN2Plus1D, self).__init__()
 
         self.dropout_p = dropout_p

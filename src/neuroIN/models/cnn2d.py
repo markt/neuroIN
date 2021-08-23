@@ -6,10 +6,30 @@ class CNN2D(nn.Module):
     Subclass of PyTorch nn.Module for a basic 2D CNN
     '''
 
-    def __init__(self, dropout_p=0.5, n_classes=2, num_channels=64, shape=(64, 640), temp_kernel_length=128, spac_kernel_length=16, F1=8, D=2, F2=16, l1=224, l2=32, **extras):
-        '''
-        size_for_fc should be automated
-        '''
+    def __init__(self, dropout_p=0.5, n_classes=2, num_channels=64, shape=(64, 640), temp_kernel_length=128, spac_kernel_length=16, F1=8, D=2, F2=16, l2=32, **extras):
+        """init for CNN2D
+
+        :param dropout_p: the dropout rate, defaults to 0.5
+        :type dropout_p: float, optional
+        :param n_classes: the number of classes, defaults to 2
+        :type n_classes: int, optional
+        :param num_channels: the number of channels, defaults to 64
+        :type num_channels: int, optional
+        :param shape: the data shape, defaults to (64, 640)
+        :type shape: tuple, optional
+        :param temp_kernel_length: the temporal kernel length, defaults to 128
+        :type temp_kernel_length: int, optional
+        :param spac_kernel_length: the spatial kernel length, defaults to 16
+        :type spac_kernel_length: int, optional
+        :param F1: the number of temporal filters, defaults to 8
+        :type F1: int, optional
+        :param D: the ratio of spatial filters to temporal filters, defaults to 2
+        :type D: int, optional
+        :param F2: the number of separable filters, defaults to 16
+        :type F2: int, optional
+        :param l2: the number of units in the final FC layer before classification, defaults to 32
+        :type l2: int, optional
+        """
 
         super().__init__()
 
