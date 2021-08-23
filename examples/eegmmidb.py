@@ -6,7 +6,7 @@ from neuroIN.io import dataset
 
 # path data will be imported into
 data_path = Path(os.getcwd()) / "data/eegmmidb"
-orig_path = Path(os.getcwd()) / "data/orig_eegmmidb"
+orig_path = Path(os.getcwd()) / "data/raw_eegmmidb"
 eegmmidb.import_eegmmidb(data_path, orig_dir=orig_path)
 
 # load Dataset object
