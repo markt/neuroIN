@@ -19,9 +19,6 @@ from torch.utils.data import Dataset as torchDataset
 from torch.utils.data import DataLoader
 from torchvision.transforms import ToTensor
 
-neuroIN_extensions = {'.edf': edf_to_np, '.gdf': gdf_to_np}
-neuroIN_data_path = Path('/Users/marktaylor/neuroIN/data')
-
 def import_dataset(orig_dir, targ_dir, dataset_extensions, dataset_name=None, orig_f_pattern='*', id_regex=r'\d+', resample_freq=None, mapping=None):
     """Import a new dataset into neuroIN.
 
@@ -35,12 +32,18 @@ def import_dataset(orig_dir, targ_dir, dataset_extensions, dataset_name=None, or
     :type orig_dir: string or pathlike
     :param targ_dir: The directory to import data to
     :type targ_dir: string or pathlike
-    :param dataset_name: The name of the dataset, defaults to None which uses the targ_dir name
-    :type dataset_name: string, optional
-    :param orig_f_pattern: The pattern of files to import, defaults to '*'
+    :param dataset_extensions: A dictionary mapping file extensions to functions processing those files into NumPy arrays
+    :type dataset_extensions: dict
+    :param dataset_name: A name for the dataset, defaults to None
+    :type dataset_name: str, optional
+    :param orig_f_pattern: The pattern used to search for files to import, defaults to '*'
     :type orig_f_pattern: str, optional
-    :param id_regex: The RegEx to parse subject ID's from files, defaults to r'\d+'
+    :param id_regex: A RegEx for extracting subject ID from a filename, defaults to r'\d+'
     :type id_regex: regexp, optional
+    :param resample_freq: A new frequency to resample the data to, defaults to None
+    :type resample_freq: int, optional
+    :param mapping: a dictionary mapping labels in the data to labels to be used for classification, defaults to None
+    :type mapping: dict, optional
     """
     orig_path, targ_path = Path(orig_dir).expanduser(), Path(targ_dir).expanduser()
 
@@ -112,9 +115,6 @@ class Set(torchDataset):
 
     Set is used for groups of data like training sets,
     while Dataset contains all data as well as metadata for a project.
-
-    :param torchDataset: [description]
-    :type torchDataset: [type]
     """
 
     def __init__(self, data_dir, transform=ToTensor(), target_transform=None):
@@ -141,9 +141,23 @@ class Set(torchDataset):
         return data, label
     
     def get_dataloader(self, batch_size, shuffle=True):
+        """Return a dataloader for the Set
+
+        :param batch_size: The batch size for the DataLoader
+        :type batch_size: int
+        :param shuffle: Whether to shuffle the data or not, defaults to True
+        :type shuffle: bool, optional
+        :return: A DataLoader for the set
+        :rtype: torch.utils.data.DataLoader
+        """
         return DataLoader(self, batch_size=batch_size, shuffle=shuffle)
     
     def get_annotation_df(self):
+        """Returns the annotation DataFrame for the Set
+
+        :return: The annotation DataFrame
+        :rtype: pandas.DataFrame
+        """
         return pd.read_csv(Path(self.data_path / "annotations.csv"))
     
     @property
@@ -151,6 +165,13 @@ class Set(torchDataset):
         return self.get_annotation_df()
     
     def mean_std(self, save=True):
+        """Return the mean and standard deviation of the Set
+
+        :param save: whether to save the mean and std dev arrays, defaults to True
+        :type save: bool, optional
+        :return: A mean array and a std dev array
+        :rtype: numpy.array
+        """
         # initialize empty array with size channels (or 2D locations) by number of samples
         means = np.zeros((self[0][0].shape[:-1] + (len(self),)))
 
@@ -167,41 +188,13 @@ class Set(torchDataset):
             np.save(self.data_path / 'std.npy', mean)
         
         return mean, std
-        
-        
-        
-
-class Set3D(Set):
-    """Set3D is a subclass of Set specifically for 3D data
-
-    :param Set: [description]
-    :type Set: [type]
-    """
-    def __getitem__(self, idx):
-        """
-        TODO: maybe call super() then add dimension??
-
-        :param idx: [description]
-        :type idx: [type]
-        :return: [description]
-        :rtype: [type]
-        """
-        data = np.load((self.data_path / self.np_files[idx]))
-        data = torch.from_numpy(data).unsqueeze(0)
-        label = self.data_labels[idx]
-
-        if self.target_transform:
-            label = self.target_transform(label)
-
-        return data, label
 
 
 class Dataset(Set):
     '''
     Dataset is a subclass of Set that contains all data for a project and associated metadata
 
-    "config.json" contains parameters for the Dataset
-
+    "config.json" contains parameters for the Dataset that will be added as attributes
     '''
 
     def __init__(self, data_dir, transform=ToTensor(), target_transform=None):
@@ -214,6 +207,13 @@ class Dataset(Set):
             setattr(self, key, value)
     
     def update_param(self, key, value):
+        """Update a parameter for the dataset, update is reflect in config.json file as well
+
+        :param key: the name of the parameter to update
+        :type key: str
+        :param value: the value to update the parameter with
+        :type value: any JSON serializable
+        """
         with open(self.data_path / "config.json", 'r') as stream:
             dataset_params = json.load(stream)
 
@@ -227,24 +227,54 @@ class Dataset(Set):
 
     # preprocessing methods
     def trim_data_length(self, length, start_i=0):
+        """Trims the length of all trials in a dataset, discarding those that are too short
+
+        :param length: the length to trim to
+        :type length: int
+        :param start_i: the index to start trimming from, defaults to 0
+        :type start_i: int, optional
+        """
         trim_length(self.data_path, length, start_i=start_i)
         self.update_param("preprocessing", self.preprocessing + [f"trim_length: {length}"])
 
-    def create_data_split(self, train_prop=0.7, val_prop=0.15, by_subject=False):
+    def create_data_split(self, train_prop=0.8, val_prop=0, by_subject=False):
+        """Split the Dataset into training, validation and testing sets
+
+        :param train_prop: the proportion of data to go in the training set, defaults to 0.8
+        :type train_prop: float, optional
+        :param val_prop: the proportion of data to go in the validation set, defaults to 0
+        :type val_prop: float, optional
+        :param by_subject: whether to create splits by subject or by trials, defaults to False
+        :type by_subject: bool, optional
+        """
         create_split(self.data_path, train_prop=train_prop, val_prop=val_prop, by_subject=by_subject)
         self.update_param("split_into_sets", True)
         self.update_param("preprocessing", self.preprocessing + [f"create_split: train_prop={train_prop}, val_prop={val_prop}, by_subject={by_subject}"])
     
     def normalize_data_from_train(self):
+        """Normalize the Dataset using the mean and std dev of the training Set (requires data to be split into sets)
+        """
         normalize_from_train(self.data_path)
         self.update_param("preprocessing", self.preprocessing + [f"normalized with train"])
 
     def data_to_3d(self, type_3d='d', d_idxs_override=None):
+        """Convert all trials in the Dataset into 3D format
+
+        :param type_3d: the type of 3D configuration to use, defaults to 'd'
+        :type type_3d: str, optional
+        :param d_idxs_override: indices for D configuration that can be used to override the automatic index selection, defaults to None
+        :type d_idxs_override: list, optional
+        """
         dir_to_3d(self.data_path, type_3d=type_3d, ch_names=self.ch_names, d_idxs_override=d_idxs_override)
         self.update_param("n_dim", 3)
         self.update_param("preprocessing", self.preprocessing + [f"to_3d: type_3d={type_3d}"])
     
     def change_label_encoding(self, encoding_dict):
+        """Change the encoding of labels to something else (note that PyTorch requires labels to be integers monotonically increasing starting from 0)
+
+        :param encoding_dict: The encoding to use for the labels
+        :type encoding_dict: dict
+        """
         for csv in self.data_path.rglob("annotations.csv"):
             annotations_df = pd.read_csv(csv)
             annotations_df['label'] = annotations_df['label'].apply(lambda x: encoding_dict[x])
@@ -252,10 +282,22 @@ class Dataset(Set):
 
 
     def get_set(self, set_name):
+        """Get a Set by name (nearly always should be either 'train', 'val', or 'test')
+
+        :param set_name: the name of the Set to get
+        :type set_name: str
+        :return: the requested Set
+        :rtype: Set
+        """
         assert self.split_into_sets == True, "Data has not been split into sets yet!"
         return Set(self.data_path / set_name, transform=self.transform, target_transform=self.target_transform)
 
     def get_sets(self):
+        """Get the training, validation, and test sets
+
+        :return: The list of Sets
+        :rtype: list
+        """
         return [self.get_set(set_name) for set_name in ['train', 'val', 'test']]
     
     @property
@@ -275,17 +317,49 @@ class Dataset(Set):
         return self.get_sets()
 
     def get_dataloader(self, set_name, batch_size, shuffle=True):
+        """Get a DataLoader for a Set by name (nearly always should be either 'train', 'val', or 'test')
+
+        :param set_name: the name of the Set to get
+        :type set_name: str
+        :param batch_size: the batch size to use
+        :type batch_size: int
+        :param shuffle: whether or not to shuffle the data, defaults to True
+        :type shuffle: bool, optional
+        :return: A DataLoader for the set
+        :rtype: torch.utils.data.DataLoader
+        """
         assert self.split_into_sets == True, "Data has not been split into sets yet!"
         return DataLoader(self.get_set(set_name), batch_size, shuffle=shuffle)
 
     def get_dataloaders(self, batch_size, shuffle=True):
+        """Get DataLoaders for the training, validation, and testing Sets.
+
+        :param batch_size: the batch size to use
+        :type batch_size: int
+        :param shuffle: whether or not to shuffle the data, defaults to True
+        :type shuffle: bool, optional
+        :return: the list of DataLoaders
+        :rtype: list
+        """
         return [self.get_dataloader(set_name, batch_size, shuffle=shuffle) for set_name in ['train', 'val', 'test']]
     
     def standardize_channels(self, ch_names=None):
+        """Standardize the Dataset's channel names
+
+        :param ch_names: channel names to replace with, defaults to None
+        :type ch_names: list, optional
+        """
         if not ch_names: ch_names = [ch.rstrip('.').upper().replace('Z', 'z').replace('FP', 'Fp') for ch in self.ch_names]
         self.update_param('ch_names', ch_names)
     
     def init_optim(self, config, fname=None):
+        """Initialize parameters for an optimization experiment
+
+        :param config: the parameter configuration dictionary to use
+        :type config: dict
+        :param fname: the file name to use for the configuration data, defaults to None
+        :type fname: str, optional
+        """
         if not fname: fname = self.name + '_' + time.strftime("%Y%m%d-%H%M%S") + '.pt'
 
         self.optim_path = self.data_path / "optims"
@@ -298,32 +372,15 @@ class Dataset(Set):
         print(f"Optimization configuration file saved to: {f}")
     
     def get_optim(self, i):
+        """Get the i'th optimization configuration dictionary
+
+        :param i: the index of the dictionary to get
+        :type i: int
+        :return: the optimization configuration dictionary
+        :rtype: dict
+        """
         return torch.load(self.model_optims[i])
 
     @property
     def last_optim(self):
         return torch.load(self.model_optims[-1])
-
-class Dataset3D(Dataset):
-    """Set3D is a subclass of Dataset specifically for 3D data
-
-    :param Set: [description]
-    :type Set: [type]
-    """
-    def __getitem__(self, idx):
-        """
-        TODO: maybe call super() then add dimension??
-
-        :param idx: [description]
-        :type idx: [type]
-        :return: [description]
-        :rtype: [type]
-        """
-        data = np.load((self.data_path / self.np_files[idx]))
-        data = torch.from_numpy(data).unsqueeze(0)
-        label = self.data_labels[idx]
-
-        if self.target_transform:
-            label = self.target_transform(label)
-
-        return data, label
