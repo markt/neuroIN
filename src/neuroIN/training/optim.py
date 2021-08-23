@@ -138,14 +138,17 @@ def run_optim(config, max_concurrent=4, num_samples=40):
 def main():
     parser = argparse.ArgumentParser(description="Optimize a Dataset")
     parser.add_argument('data_dir', help="Directory of Dataset")
+    parser.add_argument('-n', '--num_samples', nargs='?', default=40, type=int)
+    parser.add_argument('-m', '--model_optim_idx', nargs='?', default=-1, type=int)
     args = parser.parse_args()
 
     print(f"Optimizing Dataset located at: {args.data_dir}")
+    print(f"Will use {args.num_samples} samples and model optim #{args.model_optim_idx}")
 
     dataset = Dataset(args.data_dir)
 
-    config = dataset.last_optim
-    run_optim(config)
+    config = dataset.get_optim(args.model_optim_idx)
+    run_optim(config, num_samples=args.num_samples)
 
 if __name__ == "__main__":
     main()
