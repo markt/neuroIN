@@ -6,7 +6,7 @@ def dir_file_types(dir):
 
     :param dir: The directory to list files extensions from
     :type dir: string or pathlike
-    :return: exts
+    :return: extensions
     :rtype: set
     """
     data_path = Path(dir)
