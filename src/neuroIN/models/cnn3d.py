@@ -6,7 +6,7 @@ class CNN3D(nn.Module):
     Subclass of PyTorch nn.Module for a basic 2D CNN
     '''
 
-    def __init__(self, dropout_p=0.5, n_classes=2, shape=(5, 5, 640), **extras):
+    def __init__(self, dropout_p=0.5, n_classes=2, l2=32, shape=(5, 5, 640), **extras):
         '''
         size_for_fc should be automated
         '''
@@ -43,7 +43,8 @@ class CNN3D(nn.Module):
         l1 = flatten(self.layers(dummy)).shape[0]
 
         self.output = nn.Sequential(
-            nn.Linear(l1, self.n_classes)
+            nn.Linear(l1, l2),
+            nn.Linear(l2, self.n_classes)
             )
 
     def forward(self, x):
