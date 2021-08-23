@@ -1,17 +1,12 @@
 from torch.utils.data.dataset import random_split
 from neuroIN.io.dataset import Dataset
-from neuroIN.models.cnn2d import CNN2D
 
 import os
 import argparse
-import numpy as np
-from pathlib import Path
-import json
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import random_split
-from functools import partial
 
 from ray import tune
 from ray.tune.schedulers.hb_bohb import HyperBandForBOHB
@@ -112,6 +107,15 @@ def train_dataset(config, checkpoint_dir=None):
 
 
 def run_optim(config, max_concurrent=4, num_samples=40):
+    """Run ray tune optimization
+
+    :param config: the configuration optimization dictionary to use
+    :type config: dict
+    :param max_concurrent: the max number of concurrent modesl to train, defaults to 4
+    :type max_concurrent: int, optional
+    :param num_samples: the number of sample models to test, defaults to 40
+    :type num_samples: int, optional
+    """
     if not isinstance(config, dict):
         config = torch.load(config)
 
