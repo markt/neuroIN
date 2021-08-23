@@ -3,7 +3,18 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-def create_split(data_dir, train_prop=0.7, val_prop=0.15, by_subject=False):
+def create_split(data_dir, train_prop=0.8, val_prop=0, by_subject=False):
+    """Split the Dataset directory into training, validation and testing sets
+
+    :param data_dir: the directory of the Dataset
+    :type data_dir: str or pathlike
+    :param train_prop: the proportion of data to go in the training set, defaults to 0.8
+    :type train_prop: float, optional
+    :param val_prop: the proportion of data to go in the validation set, defaults to 0
+    :type val_prop: float, optional
+    :param by_subject: whether to create splits by subject or by trials, defaults to False
+    :type by_subject: bool, optional
+    """
     assert (train_prop + val_prop) > 0 and (train_prop + val_prop) < 1, "Sum of training and validation proportion must be greater than zero and less than one"
 
     data_path = Path(data_dir)

@@ -1,7 +1,18 @@
 from pathlib import Path
 import numpy as np
 
-def dir_to_3d(data_dir, type_3d='d', ch_names=None):
+def dir_to_3d(data_dir, type_3d='d', ch_names=None, d_idxs_override=None):
+    """Convert all trials in the Dataset directory into 3D format
+
+    :param data_dir: the directory of the Dataset
+    :type data_dir: str or pathlike
+    :param type_3d: the type of 3D configuration to use, defaults to 'd'
+    :type type_3d: str, optional
+    :param ch_names: channel names to use for finding indices to keep, defaults to None
+    :type ch_names: list, optional
+    :param d_idxs_override: indices for D configuration that can be used to override the automatic index selection, defaults to None
+    :type d_idxs_override: list, optional
+    """
     data_path = Path(data_dir)
 
     if not ch_names:
@@ -20,12 +31,15 @@ def dir_to_3d(data_dir, type_3d='d', ch_names=None):
         d_names = ['FCz', 'C2', 'CP4', 'Cz', 'CP2',
                    'C1', 'CPz', 'P2', 'CP1', 'Pz',
                    'CP3', 'P1', 'POz']
-        assert set(d_names).issubset(ch_names), "Dataset's channel names must be standardized!"
+        if not d_idxs_override:
+            assert set(d_names).issubset(ch_names), "Dataset's channel names must be standardized!"
 
-        d_idxs = [ch_names_to_idx[n] for n in d_names]
+            d_idxs = [ch_names_to_idx[n] for n in d_names]
+        else:
+            d_idxs = d_idxs_override
         to_3d_func = npy_to_d_3d
 
-    for f in data_path.glob('*.npy'):
+    for f in data_path.rglob('*.npy'):
         to_3d_func(f, d_idxs, save=True)
 
 def npy_to_d_3d(npy_file, d_idxs, save=True):
