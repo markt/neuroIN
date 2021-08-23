@@ -1,6 +1,4 @@
 from .utils import dir_file_types
-from .edf import edf_to_np
-from .gdf import gdf_to_np
 from ..preprocessing.train_test_split import create_split
 from ..preprocessing.crop import trim_length
 from ..preprocessing.to_3d import dir_to_3d
