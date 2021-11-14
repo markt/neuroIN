@@ -17,7 +17,7 @@ from torch.utils.data import Dataset as torchDataset
 from torch.utils.data import DataLoader
 from torchvision.transforms import ToTensor
 
-def import_dataset(orig_dir, targ_dir, dataset_extensions, dataset_name=None, orig_f_pattern='*', id_regex=r'\d+', resample_freq=None, mapping=None):
+def import_dataset(orig_dir, targ_dir, dataset_extensions, dataset_name=None, orig_f_pattern='*', id_regex=r'\d+', resample_freq=None, mapping=None,  np_dtype=np.float32):
     """Import a new dataset into neuroIN.
 
     This function imports a dataset of files with recognized extensions into
@@ -74,9 +74,9 @@ def import_dataset(orig_dir, targ_dir, dataset_extensions, dataset_name=None, or
 
             try:
                 if mapping:
-                    trials, labels, mapping, ch_names = ext_func(orig_f, resample_freq=resample_freq, mapping=mapping)
+                    trials, labels, mapping, ch_names = ext_func(orig_f, resample_freq=resample_freq, np_dtype=np_dtype, mapping=mapping)
                 else:
-                    trials, labels, mapping, ch_names = ext_func(orig_f, resample_freq=resample_freq)
+                    trials, labels, mapping, ch_names = ext_func(orig_f, resample_freq=resample_freq, np_dtype=np_dtype)
 
                 for i, trial in enumerate(trials):
                     npy_f = f'{f_name}_{i}.npy'

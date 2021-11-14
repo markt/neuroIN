@@ -209,8 +209,8 @@ class MultiBranchCNN2Plus1D(nn.Module):
         :type n_classes: int, optional
         :param shape: the data shape, defaults to (5, 5, 640)
         :type shape: tuple, optional
-        :param l2: the number of units in the final FC layer before classification, defaults to 32
-        :type l2: int, optional
+        :param fc_size: the number of units in the final FC layer before classification, defaults to 32
+        :type fc_size: int, optional
         """
         super(MultiBranchCNN2Plus1D, self).__init__()
 

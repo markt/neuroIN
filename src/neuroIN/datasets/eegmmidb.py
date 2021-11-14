@@ -38,19 +38,23 @@ def edf_to_np(edf_f, mapping=None, ch_names=None, np_dtype=np.float32, resample_
 
     return data, labels, mapping, edf.ch_names
 
-def import_eegmmidb(targ_dir, orig_dir=None, subjects='all', runs='all', download_only=False, mapping={'T0': -1, 'T1': 0, 'T2': 1}):
-    """[summary]
+def import_eegmmidb(targ_dir, orig_dir=None, subjects='all', runs='all', download_only=False, mapping={'T0': -1, 'T1': 0, 'T2': 1}, dataset_extenions={'.edf': edf_to_np}, np_dtype=np.float32):
+    """Import the eegmmidb into neuroIN.
 
-    If specifying an original directory, users will be asked if they would like the directory as the default EEGBCI dataset path in the mne-python config
+    This entails installing the raw .EDF files first then writing them into .npy files.
 
-    :param targ_dir: [description]
-    :type targ_dir: [type]
-    :param orig_dir: [description], defaults to None
-    :type orig_dir: [type], optional
+    :param targ_dir: the directory to import the package into
+    :type targ_dir: string or pathlike
+    :param orig_dir: the directory to install raw, defaults to None
+    :type orig_dir: string or pathlike, optional
     :param subjects: [description], defaults to 'all'
     :type subjects: str, optional
     :param runs: [description], defaults to 'all'
     :type runs: str, optional
+    :param download_only: [description], defaults to False
+    :type download_only: bool, optional
+    :param mapping: [description], defaults to {'T0': -1, 'T1': 0, 'T2': 1}
+    :type mapping: dict, optional
     """
     targ_path = Path(targ_dir).expanduser()
     if orig_dir:
@@ -70,8 +74,7 @@ def import_eegmmidb(targ_dir, orig_dir=None, subjects='all', runs='all', downloa
     print("Dataset downloaded.")
 
     if not download_only:
-        dataset_extenions = {'.edf': edf_to_np}
-        import_dataset(orig_path, targ_path, dataset_extenions=dataset_extenions, dataset_name="eegmmidb", mapping=mapping)
+        import_dataset(orig_path, targ_path, dataset_extenions, dataset_name="eegmmidb", mapping=mapping,  np_dtype=np_dtype)
 
         data = Dataset(targ_path)
 

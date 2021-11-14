@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
    name='neuroIN',
-   version='0.0.1',
+   version='0.1.0',
    author='Mark Taylor',
    author_email='mark.a.taylor.gr@dartmouth.edu',
    packages=find_packages(where="src"),

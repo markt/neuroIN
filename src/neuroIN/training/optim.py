@@ -139,7 +139,7 @@ def run_optim(config, max_concurrent=4, num_samples=40):
     print(f"{best_trial.config}, {best_trial.last_result['mean_loss']}, {best_trial.last_result['mean_accuracy']}")
     test_best_model(best_trial)
 
-def main():
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Optimize a Dataset")
     parser.add_argument('data_dir', help="Directory of Dataset")
     parser.add_argument('-n', '--num_samples', nargs='?', default=40, type=int)
@@ -153,6 +153,3 @@ def main():
 
     config = dataset.get_optim(args.model_optim_idx)
     run_optim(config, num_samples=args.num_samples)
-
-if __name__ == "__main__":
-    main()
